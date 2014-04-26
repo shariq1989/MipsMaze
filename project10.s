@@ -584,10 +584,75 @@ Visit:
  	addiu $sp, $sp, -32 # space for 3 words (32 – 20 = 12 bytes) 
  
  	# and finally we can grab the input parameters 
- 	lw $s0, -4($fp) # load x into $s0 
+ 	lw $s0, -4($fp) # load x into $s0
+ 	lw $s1, -8($fp) # load y into $s1 
  
- 	####prodecure###
+ 	####PROCEDURE###
  	
+ 	#   // Set my current location to be an empty passage.
+ 	#   grid[ XYToIndex(x,y) ] = ' ';	
+	jal	XYToIndex #convert x, y to grid location
+  	lw	$s5, -4($sp)	# load result of XYtoIndex
+	la	$s2, grid	# get the base address	
+	lb	$s3, SPACE	# store the ' ' ASCII code
+	add	$s2, $s2, $s5 	# go to the index
+	sb	$s3, 0($s2)	# put a ' ' in the grid location from XYToIndexs
+
+
+	
+
+	
+	#   // Create an local array containing the 4 directions and shuffle their
+	#   // order.
+	#   int dirs[4];
+	#   dirs[0] = NORTH;
+	#   dirs[1] = EAST;
+	#   dirs[2] = SOUTH;
+	#   dirs[3] = WEST;
+	
+	#   for (int i=0; i<4; ++i)
+	#   {
+	#     int r = rand() & 3;
+	#     int temp = dirs[r];
+	#     dirs[r] = dirs[i];
+	#     dirs[i] = temp;
+	#   }
+	#   
+	#   // Loop through every direction and attempt to Visit that direction.
+	#   for (int i=0; i<4; ++i)
+	#   {
+	#     // dx,dy are offsets from current location. Set them based
+	#     // on the next direction I wish to try.
+	#     int dx=0, dy=0;
+	#     switch (dirs[i])
+	#     {
+	#       case NORTH: dy = -1; break;
+	#       case SOUTH: dy = 1; break;
+	#       case EAST: dx = 1; break;
+	#       case WEST: dx = -1; break;
+	#     }
+	#     
+	#     // Find the (x,y) coordinates of the grid cell 2 spots
+	#     // away in the given direction.
+	#     int x2 = x + (dx<<1);
+	#     int y2 = y + (dy<<1);
+	# 
+	#     if (IsInBounds(x2,y2))
+	#     {
+	#       if (grid[ XYToIndex(x2,y2) ] == '#')
+	#       {
+	#         // (x2,y2) has not been visited yet... knock down the
+	#         // wall between my current position and that position
+	#         grid[ XYToIndex(x2-dx,y2-dy) ] = ' ';
+	#         
+	#         // Recursively Visit (x2,y2)
+	#         Visit(x2,y2);
+	#       }
+	#     }
+	#   }
+	# }
+	
+	
  
  	# when done restore the registers 
  	lw $s0, -20($sp) # put old $s0 back 
