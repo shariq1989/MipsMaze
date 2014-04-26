@@ -596,12 +596,8 @@ Visit:
 	la	$s2, grid	# get the base address	
 	lb	$s3, SPACE	# store the ' ' ASCII code
 	add	$s2, $s2, $s5 	# go to the index
-	sb	$s3, 0($s2)	# put a ' ' in the grid location from XYToIndexs
-
-
-	
-
-	
+	sb	$s3, 0($s2)	# put a ' ' in the grid location from XYToIndex
+		
 	#   // Create an local array containing the 4 directions and shuffle their
 	#   // order.
 	#   int dirs[4];
@@ -610,6 +606,11 @@ Visit:
 	#   dirs[2] = SOUTH;
 	#   dirs[3] = WEST;
 	
+	lw	$t0, NORTH
+	lw	$t1, EAST
+	lw	$t2, SOUTH
+	lw	$t3, WEST
+	
 	#   for (int i=0; i<4; ++i)
 	#   {
 	#     int r = rand() & 3;
@@ -617,7 +618,30 @@ Visit:
 	#     dirs[r] = dirs[i];
 	#     dirs[i] = temp;
 	#   }
-	#   
+Randomize:
+	li,	$t7, 1		#min
+	li,	$t8, 4		#max
+	lw	$t7, -8($sp)	#store min
+	lw	$t8, -12($sp)	#store max
+	jal	rand		#run rand
+	sw	$t6, -4($sp)	#store random number
+	
+	li  $v0, 1           # service 1 is print integer
+   	add $a0, $t6, $zero  # load desired value into argument register $a0, using pseudo-op
+    	syscall
+  	
+	andi	$t6, $t6, 3	#int r = rand() & 3;
+	
+	li  $v0, 1           # service 1 is print integer
+   	add $a0, $t6, $zero  # load desired value into argument register $a0, using pseudo-op
+    	syscall
+	
+	li	$t4, 1		# initialize the counter
+	li	$t5, 4		# initialize the end of count
+	blt	$t4, $t5, Randomize
+	
+
+  
 	#   // Loop through every direction and attempt to Visit that direction.
 	#   for (int i=0; i<4; ++i)
 	#   {
