@@ -541,6 +541,7 @@ Randomize:
 	# For loop iterator
 	li	$t4, 1		# initialize the counter
 
+RandomizeFor:
 	# Here we go. 1) Generate random number
 	li,	$t7, 0		#min
 	li,	$t8, 3		#max
@@ -552,22 +553,49 @@ Randomize:
 
 	# Before we can do any swapping, we need to know where our local copy of
 	# the dirs array is. Looks like it was loaded into $t0-$t3, as of line
-	# 609. It might be prudent in other situations to do this with a stack
+	# 522. It might be prudent in other situations to do this with a stack
 	# frame, but since this is restricted to main and Visit, we should
 	# probably be ok. 
 	# 2) Swap dirs[random] and dirs[i]
-	# Hm. I can't reference one register from a set of registers by using
-	# the value of our iterator ($t4), so maybe it would be best to do this
-	# with branches. 
+	# Seems like the only way I can reference a register through a value
+	# from another register is by addressing it by number, not by name. So
+	# let's try adding to get where we ned to go.
+	# t0, t1, t2, t3, where the four directions are, are at registers 8-15,
+	# which means our lowest possible location is 8 - 0 = 8. So we add 8 to
+	# the random we generated.
 
-	beq $t4, NORTH, swapNorth
-	beq $t4, EAST, swapEast
-	beq $t4, SOUTH, swapSouth
-	beq $t4, WEST, swapWest
+	addi $t4, $t4, 8
+
+	# Do the same for the random number.
 	
+	addi $t6, $t6, 8
 	
-	li	$t5, 4		# initialize the end of count
-	blt	$t4, $t5, Randomize
+	# Use $t9 as our temp. Copy dirs[ r ] into it. We address dirs[ r ] as
+	# the random number we generated plus eight, which should give us
+	# something between 8 and 11.
+	add $t9, 0($t6), $0
+
+	# We stored dirs[ r ] so we can set it equal to dirs[ i ] now
+	add 0($t6), 0($t4), $0
+
+	# Finally, load our temp back into dirs[ i ]
+	add 0($t4), $t9, $0
+	# 2) done
+
+	# We have to subtract 8 from $t4 to get our iterator back into the
+	# acceptable range. Since we don't need $t6 anymore we'll store the 8
+	# there
+	li $t6, 8
+
+	# Do subtraction
+	subu $t4, $t4, $t6
+
+	# Initialize the upper bound for the iterator
+	li	$t5, 4
+
+	# Increment the iterator and branch back to the top
+	addi $t4, $t4, 1
+	blt	$t4, $t5, RandomizeFor
 	
 
   
