@@ -496,7 +496,7 @@ Visit:
  	# and make space for any local variables 
  	addiu $sp, $sp, -32 # space for 3 words (32 – 20 = 12 bytes) 
  
- 	# and finally we can grab the input parameters 
+ 	# and finally we can grab the input parameters we need for XYToIndex
  	lw $s0, -4($fp) # load x into $s0
  	lw $s1, -8($fp) # load y into $s1 
  
@@ -532,24 +532,40 @@ Visit:
 	#     dirs[i] = temp;
 	#   }
 Randomize:
-	li,	$t7, 1		#min
-	li,	$t8, 4		#max
+	# How this procecure works:
+	# [For i = 0 through 3]
+	# 1) generate a random number 0-3
+	# 2) Swap dirs[random] and dirs[i]
+	# 3) Branch to beginning of for
+
+	# For loop iterator
+	li	$t4, 1		# initialize the counter
+
+	# Here we go. 1) Generate random number
+	li,	$t7, 0		#min
+	li,	$t8, 3		#max
 	lw	$t7, -8($sp)	#store min
 	lw	$t8, -12($sp)	#store max
 	jal	rand		#run rand
 	sw	$t6, -4($sp)	#store random number
+	# 1) done
+
+	# Before we can do any swapping, we need to know where our local copy of
+	# the dirs array is. Looks like it was loaded into $t0-$t3, as of line
+	# 609. It might be prudent in other situations to do this with a stack
+	# frame, but since this is restricted to main and Visit, we should
+	# probably be ok. 
+	# 2) Swap dirs[random] and dirs[i]
+	# Hm. I can't reference one register from a set of registers by using
+	# the value of our iterator ($t4), so maybe it would be best to do this
+	# with branches. 
+
+	beq $t4, NORTH, swapNorth
+	beq $t4, EAST, swapEast
+	beq $t4, SOUTH, swapSouth
+	beq $t4, WEST, swapWest
 	
-	li  $v0, 1           # service 1 is print integer
-   	add $a0, $t6, $zero  # load desired value into argument register $a0, using pseudo-op
-    	syscall
-  	
-	andi	$t6, $t6, 3	#int r = rand() & 3;
 	
-	li  $v0, 1           # service 1 is print integer
-   	add $a0, $t6, $zero  # load desired value into argument register $a0, using pseudo-op
-    	syscall
-	
-	li	$t4, 1		# initialize the counter
 	li	$t5, 4		# initialize the end of count
 	blt	$t4, $t5, Randomize
 	
