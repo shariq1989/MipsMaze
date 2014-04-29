@@ -105,12 +105,13 @@ main:
 	sw	$ra, 0($sp)	# save the return address
 	jal	handleWIDTH	# get width
 	jal	handleHEIGHT	# get height
+	jal	handleGRID_SIZE # calculate grid size
 	jal	srand		# get a random seed
 	jal	ResetGrid	# reset the grid to '#'s
 	li	$t0, 1		# set up for start of generation at (1,1)
 	sw	$t0, -4($sp)	# push first param
 	sw	$t0, -8($sp) 	# push second param
-	jal	Visit		# start the recursive generation
+#	jal	Visit		# start the recursive generation
 	jal	PrintGrid	# display the grid
 	lw	$ra, 0($sp)	# restore the return address
 	jr	$ra		# exit the program
@@ -214,19 +215,20 @@ handleHEIGHT:
 	jr	$ra		# return
 
 #==============================================================================
-# handleHEIGHT()
+# handleGRID_SIZE()
 #==============================================================================	
-handleHEIGHT:
-	la	$a0, inputHEIGHT #output message for height
-	li	$v0, 4 
-	syscall 	
-	li	$v0, 5 #input height 
-	syscall	
-	sw	$v0, GRID_HEIGHT #save register to memory
-	li	$t0, 11 #must be greater than
-	blt	$v0, $t0, handleHEIGHT #error handling
-	li	$t0, 99 #must be less than
-	bgt	$v0, $t0, handleHEIGHT #error handling
+handleGRID_SIZE:
+	lw	$t0, GRID_WIDTH	#load width
+	lw	$t1, GRID_HEIGHT#load height
+	multu	$t0, $t1	# grid size
+	mflo	$t0		# lo result is new seed
+	sw	$t0, GRID_SIZE	# store the seed in memory
+
+	#testing
+	#li  $v0, 1           # service 1 is print integer
+   	#add $a0, $t0, $zero  # load desired value into argument register $a0, using pseudo-op
+    	#syscall
+    	
 	jr	$ra		# return
 #==============================================================================
 # srand()
