@@ -111,7 +111,7 @@ main:
 	li	$t0, 1		# set up for start of generation at (1,1)
 	sw	$t0, -4($sp)	# push first param
 	sw	$t0, -8($sp) 	# push second param
-#	jal	Visit		# start the recursive generation
+	jal	Visit		# start the recursive generation
 	jal	PrintGrid	# display the grid
 	lw	$ra, 0($sp)	# restore the return address
 	jr	$ra		# exit the program
@@ -518,9 +518,24 @@ Visit:
 	# floating around in registers and might get destroyed.
 	sw $ra, -16($sp)
 	sw $fp, -12($sp)
+	# We also need to store the values of the six s-registers we'll be
+	# using. We'll put them at positions 5 through 11 above the current
+	# stack pointer (that is: words -20(sp) thru -44(sp) ).
+	sw $s0, -20($sp)
+	sw $s1, -24($sp)
+	sw $s2, -28($sp)
+	sw $s3, -32($sp)
+	sw $s4, -36($sp)
+	sw $s5, -40($sp)
+	sw $s6, -44($sp)
+	
 	# With the registers stored, we can safely move the frame pointer. 
 	or $fp, $sp, 0
 
+	# Here's the storage breakdown:
+	# The old ra : 1 word
+	# The old fp : 1 word
+	# Six s-registers we'll use : 6 words
 	# We'll also need space for our local variables:
 	# The current x position : 1 word
 	# The current y position : 1 word
@@ -528,16 +543,16 @@ Visit:
 	# Our randomly generated value : 1 word
 	# An array to hold our positions to visit : 4 words
 	# One more for certainty
-	# Total: 9 words
+	# Total: 15 words
 
-	# We need to move sp up to -20sp for the things we already stored, and
-	# add another 9 words for the things we'll need to store, totalling 32
-	# words.
-	addi $sp, $sp, -32
+	# We need to move sp up to -48(sp) for the things we already stored, and
+	# add another 15 words for the things we'll need to store, totalling (
+	# 48 + (15 * 4 = 60) ) = 108 words.
+	addi $sp, $sp, -108
 
-	# sp is now above our Visit's parameters, and we can use space above
-	# sp (i.e.: in the negative direction) to store anything we need to
-	# store.
+	# sp is now above our Visit's parameters, and we also have everything
+	# stored that we need to restore the previous call's state. 
+
 
  	####PROCEDURE###
  	
@@ -773,6 +788,10 @@ RandomizeFor:
 	#   }
 	# }
 	
+	# OK. The first step in this is the For loop which enforces visiting
+	# every direction.
+VisitFor:
+	# 
 	
  
  	# when done restore the registers 
