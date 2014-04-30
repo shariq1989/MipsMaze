@@ -484,34 +484,96 @@ Visit:
 	# TO DO: Write the code.  Don't forget, it won't work if you don't
 	#        use a stack frame to make it reentrant.
 	
-	# first, save the old frame pointer and return address on the stack 
-	# and point the frame pointer to the bottom of the frame 
- 	sw $fp, -12($sp) # save the old frame pointer 
-	sw $ra, -16($sp) # save the return address 
- 	move $fp, $sp # copy the stack pointer to the frame pointer 
+#	!!!!!!!
+# 	Stubbed out: being rewritten
+# 	!!!!!!!
+#	# first, save the old frame pointer and return address on the stack 
+#	# and point the frame pointer to the bottom of the frame 
+# 	sw $fp, -12($sp) # save the old frame pointer 
+#	sw $ra, -16($sp) # save the return address 
+# 	move $fp, $sp # copy the stack pointer to the frame pointer 
+# 
+# 	# now we can save any registers we need. 
+# 	sw $s0, -20($sp) # will hold current x or scratch 
+#
+#	#the sample code had "..." here.. why?
+# 
+# 	# and make space for any local variables 
+# 	addiu $sp, $sp, -32 # space for 3 words (32 Â– 20 = 12 bytes) 
+# 
+# 	# and finally we can grab the input parameters we need for XYToIndex
+# 	lw $s0, -4($fp) # load x into $s0
+# 	lw $s1, -8($fp) # load y into $s1 
  
- 	# now we can save any registers we need. 
- 	sw $s0, -20($sp) # will hold current x or scratch 
+	# First, we need to set up the stack and frame pointers so that we can
+	# use the frame pointer to reference variables that Visit was called
+	# with and the stack pointer to reference other things we need. 
+	# The only things Visit was called with are:
+	# -8(sp): y
+	# -4(sp): x
+	# We'll make it so that we can call these at -8(fp) and -4(fp),
+	# respectively, by moving the address pointed to by sp into fp. 
+	# Before we do that, though, we need to store the return address and old
+	# frame pointer address for this instance of Visit-- they're currently
+	# floating around in registers and might get destroyed.
+	sw $ra, -16($sp)
+	sw $fp, -12($sp)
+	# With the registers stored, we can safely move the frame pointer. 
+	or $fp, $sp, 0
 
-	#the sample code had "..." here.. why?
- 
- 	# and make space for any local variables 
- 	addiu $sp, $sp, -32 # space for 3 words (32 – 20 = 12 bytes) 
- 
- 	# and finally we can grab the input parameters we need for XYToIndex
- 	lw $s0, -4($fp) # load x into $s0
- 	lw $s1, -8($fp) # load y into $s1 
- 
+	# We'll also need space for our local variables:
+	# The current x position : 1 word
+	# The current y position : 1 word
+	# The current xy position as a single value (y * width) + x : 1 word
+	# Our randomly generated value : 1 word
+	# An array to hold our positions to visit : 4 words
+	# One more for certainty
+	# Total: 9 words
+
+	# We need to move sp up to -20sp for the things we already stored, and
+	# add another 9 words for the things we'll need to store, totalling 32
+	# words.
+	addi $sp, $sp, -32
+
+	# sp is now above our Visit's parameters, and we can use space above
+	# sp (i.e.: in the negative direction) to store anything we need to
+	# store.
+
  	####PROCEDURE###
  	
  	#   // Set my current location to be an empty passage.
  	#   grid[ XYToIndex(x,y) ] = ' ';	
-	jal	XYToIndex #convert x, y to grid location
-  	lw	$s5, -4($sp)	# load result of XYtoIndex
+
+	# Load parameters for XYToIndex.
+	# x is at -4(fp), XYTI expects it at $s0
+	lw $s0, -4($fp)
+	# y is at -8(fp), XYTI '           ' $s1
+	lw $s1, -8($fp)
+	# Run XYToIndex, result stored at -4(sp)
+	jal	XYToIndex 
+
+	# Load the output of XYToIndex to $s2. 
+  	lw	$s4, -4($sp)	
 	la	$s2, grid	# get the base address	
 	lb	$s3, SPACE	# store the ' ' ASCII code
-	add	$s2, $s2, $s5 	# go to the index
+	add	$s2, $s2, $s4 	# go to the index
 	sb	$s3, 0($s2)	# put a ' ' in the grid location from XYToIndex
+
+	# Load the output of XYToIndex to $s2
+	lw $s2, -4($sp)
+	# Get the address of the beginning of the grid
+	la $s3, grid
+	# Store the ASCII value for character ' '
+	lb $s4, SPACE
+	# Add together the original index of the grid and the index returned by
+	# XYToIndex to get the absolute index of the space we want to change.
+	# Store it in $s2.
+	add $s2, $s2, $s3
+	# Store the space value in the location we calculated, overwriting the #.
+	sb $s3, 0($s2)
+
+	# We'll store our current location in $s2 for the foreseeable future,
+	# which leaves $s0 through $s2 occupied.
 		
 	#   // Create an local array containing the 4 directions and shuffle their
 	#   // order.
@@ -520,12 +582,31 @@ Visit:
 	#   dirs[1] = EAST;
 	#   dirs[2] = SOUTH;
 	#   dirs[3] = WEST;
+	# First we make the array. We'll store it in registers temporarily.
 	
 	lw	$t0, NORTH
 	lw	$t1, EAST
 	lw	$t2, SOUTH
 	lw	$t3, WEST
+
+	# In order to reference a particular part of the array based on a
+	# parameter (i.e.: our randomly generated value) we need to store it on
+	# the stack rather than inside a set of registers. First we'll just push
+	# all of these above the stack pointer.
+	sw $t0,  28($sp) #NORTH
+	sw $t1,  24($sp) #EAST
+	sw $t2,  20($sp) #SOUTH
+	sw $t3,  16($sp) #WEST
+
+	# But we still need to keep track of where they are, and arithmetic will
+	# be helped by having a pointer to the first word in the array. We'll
+	# put it at $s3, the first register not already being used.
+	sa $s3, 28($sp)
 	
+	# We'll need another pointer to select the x'th element from our array,
+	# where x is the random number we generated.
+	sa $s4, 28($sp)
+
 	#   for (int i=0; i<4; ++i)
 	#   {
 	#     int r = rand() & 3;
@@ -540,65 +621,122 @@ Randomize:
 	# 2) Swap dirs[random] and dirs[i]
 	# 3) Branch to beginning of for
 
-	# For loop iterator
-	li	$t4, 1		# initialize the counter
+	# For loop iterator. This needs to be saved across calls, so we should
+	# put it in an s-register. $s5 is unoccupied. 
+	li	$s5, 4		# initialize the counter (we'll count down)
 
 RandomizeFor:
-	# Here we go. 1) Generate random number
-	li,	$t7, 0		#min
-	li,	$t8, 3		#max
-	lw	$t7, -8($sp)	#store min
-	lw	$t8, -12($sp)	#store max
-	jal	rand		#run rand
-	sw	$t6, -4($sp)	#store random number
-	# 1) done
+	# Ok. 1) generate a random number 0-3.
+	# Load our min and max.
+	li $t5, 0 	# min
+	li $t6, 3 	# max
 
-	# Before we can do any swapping, we need to know where our local copy of
-	# the dirs array is. Looks like it was loaded into $t0-$t3, as of line
-	# 522. It might be prudent in other situations to do this with a stack
-	# frame, but since this is restricted to main and Visit, we should
-	# probably be ok. 
-	# 2) Swap dirs[random] and dirs[i]
-	# Seems like the only way I can reference a register through a value
-	# from another register is by addressing it by number, not by name. So
-	# let's try adding to get where we ned to go.
-	# t0, t1, t2, t3, where the four directions are, are at registers 8-15,
-	# which means our lowest possible location is 8 - 0 = 8. So we add 8 to
-	# the random we generated.
+	# Now store our min at -8($sp) and our max at -12($sp).
+	sw $t5, -8($sp)		# Store min	
+	sw $t6, -12($sp)	# Store max
 
-	addi $t4, $t4, 8
+	# Call rand. It will leave the random inside -4($sp).
+	jal rand
+	# Retrieve our random value. $s6 is unoccupied, put it there.
+	lw $s6, -4($sp)
+	# 1) is done
 
-	# Do the same for the random number.
+	# 2) Find dirs[random] and dirs[i] and then swap them.
+	# 2a) Find dirs[random] with pointer arithmetic
+	# We have a pointer to dirs[0] stored already in $s4. And we know the
+	# value of our random. If we multiply our random by 4 and add that
+	# amount to $s4, we'll get a pointer to dirs[random].
+	# Get 4
+	li $t7, 4
+	# Multiply random by 4, store back in the register that held random
+	mul $s6, $s6, $t7
+	# Add 4 * random to our pointer and store in its original register
+	add $s4, $s4, $s6
+	# 2a) is done [$s4 points to dirs[random] ]
+
+	# 2b) find dirs[i] with pointer arithmetic
+	# Same thing as before. Multiply i by 4 and add the result to the
+	# pointer.
+	# Multiply i by 4
+	mul $s5, $s5, $t7
+	# Add 4 * i to the pointer, store in its original register
+	add $s3, $s3, $s5
+	# 2b) is done [$s3 points to dirs[i] ]
 	
-	addi $t6, $t6, 8
+	# 2c) swap them - easy
+	lw $t8, 0($s3) 	# Load dirs[i] into t8
+	lw $t9, 0($s4) 	# Load dirs[random] into t9
+	sw $t9, 0($s3) 	# Load dirs[random] into dirs[i]
+	sw $t8, 0($s4) 	# Load dirs[i] into dirs[random]
+
+	# Decrement the iterator
+	li $t0, 1
+	sub $s5, $s5, $t0
 	
-	# Use $t9 as our temp. Copy dirs[ r ] into it. We address dirs[ r ] as
-	# the random number we generated plus eight, which should give us
-	# something between 8 and 11.
-	add $t9, 0($t6), $0
+	# If we haven't run this [4,3,2,1] = 4 times yet, branch back to
+	# RandomizeFor
+	bgtz $s5, RandomizeFor
 
-	# We stored dirs[ r ] so we can set it equal to dirs[ i ] now
-	add 0($t6), 0($t4), $0
 
-	# Finally, load our temp back into dirs[ i ]
-	add 0($t4), $t9, $0
-	# 2) done
 
-	# We have to subtract 8 from $t4 to get our iterator back into the
-	# acceptable range. Since we don't need $t6 anymore we'll store the 8
-	# there
-	li $t6, 8
-
-	# Do subtraction
-	subu $t4, $t4, $t6
-
-	# Initialize the upper bound for the iterator
-	li	$t5, 4
-
-	# Increment the iterator and branch back to the top
-	addi $t4, $t4, 1
-	blt	$t4, $t5, RandomizeFor
-	
+# !!!!!!!
+# Stubbed out: being rewritten
+# !!!!!!!
+#	# Here we go. 1) Generate random number
+#	li,	$t7, 0		#min
+#	li,	$t8, 3		#max
+#	sw	$t7, -8($sp)	#store min
+#	sw	$t8, -12($sp)	#store max
+#	jal	rand		#run rand
+#	lw	$t6, -4($sp)	#store random number
+#	# 1) done
+#
+#	# We've got a random number, now we need to do some swapping. This
+#	# requires that we put the array onto the stack. We'll say that we store
+#	# the four directions at:
+#	# dirs[0]: -8($sp)
+#	# dirs[1]: -
+#	# 2) Swap dirs[random] and dirs[i]
+#	# Seems like the only way I can reference a register through a value
+#	# from another register is by addressing it by number, not by name. So
+#	# let's try adding to get where we ned to go.
+#	# t0, t1, t2, t3, where the four directions are, are at registers 8-15,
+#	# which means our lowest possible location is 8 - 0 = 8. So we add 8 to
+#	# the random we generated.
+#
+#	addi $t4, $t4, 8
+#
+#	# Do the same for the random number.
+#	
+#	addi $t6, $t6, 8
+#	
+#	# Use $t9 as our temp. Copy dirs[ r ] into it. We address dirs[ r ] as
+#	# the random number we generated plus eight, which should give us
+#	# something between 8 and 11.
+#	add $t9, 0($t6), $0
+#
+#	# We stored dirs[ r ] so we can set it equal to dirs[ i ] now
+#	add 0($t6), 0($t4), $0
+#
+#	# Finally, load our temp back into dirs[ i ]
+#	add 0($t4), $t9, $0
+#	# 2) done
+#
+#	# We have to subtract 8 from $t4 to get our iterator back into the
+#	# acceptable range. Since we don't need $t6 anymore we'll store the 8
+#	# there
+#	li $t6, 8
+#
+#	# Do subtraction
+#	subu $t4, $t4, $t6
+#
+#	# Initialize the upper bound for the iterator
+#	li	$t5, 4
+#
+#	# Increment the iterator and branch back to the top
+#	addi $t4, $t4, 1
+#	blt	$t4, $t5, RandomizeFor
+#	
 
   
 	#   // Loop through every direction and attempt to Visit that direction.
